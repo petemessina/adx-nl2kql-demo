@@ -2,65 +2,143 @@
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel;
-using System.ComponentModel;
 
 namespace adx_nl2kql_demo.Agents
 {
+    /// <summary>
+    /// Agent responsible for generating Kusto Query Language (KQL) queries from natural language inputs.
+    /// Inherits from ChatHistoryAgent to integrate with conversation flow.
+    /// </summary>
     public class KustoQueryAgent : ChatHistoryAgent
     {
+        // Store the kernel builder for potential later use
         private readonly IKernelBuilder _kernelBuilder;
+
+        // Underlying agent that handles the actual chat completion interactions
         private readonly ChatCompletionAgent _agent;
 
+        /// <summary>
+        /// Override the Name property from base class to provide a specific agent identifier
+        /// </summary>
         public new string Name => "KustoQueryAgent";
 
+        /// <summary>
+        /// Override the Description property from base class to describe this agent's purpose
+        /// </summary>
         public new string Description => "Generates Kusto queries.";
 
+        /// <summary>
+        /// Initializes a new instance of the KustoQueryAgent.
+        /// </summary>
+        /// <param name="kernelBuilder">Builder that provides configuration for the Semantic Kernel</param>
         public KustoQueryAgent(IKernelBuilder kernelBuilder)
         {
+            // Build a kernel instance from the provided builder
             Kernel kernel = kernelBuilder.Build();
+
+            // Configure OpenAI settings to automatically invoke kernel functions 
+            // when the model detects a tool call in its response
             var executionSettings = new OpenAIPromptExecutionSettings
             {
                 ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
             };
 
+            // Create arguments with the execution settings
             var arguments = new KernelArguments(executionSettings);
 
+            // Initialize the ChatCompletionAgent with all required settings
             _agent = new()
             {
                 Name = Name,
                 Description = Description,
+                // KustoAgentSystemPrompt contains detailed instructions and schema for generating KQL queries
                 Instructions = KustoAgentSystemPrompt,
                 Kernel = kernel,
                 Arguments = arguments
             };
         }
 
+        /// <summary>
+        /// Invokes the agent with a chat history to generate a non-streaming response.
+        /// Delegates to the underlying ChatCompletionAgent.
+        /// </summary>
+        /// <param name="history">The conversation history</param>
+        /// <param name="arguments">Optional kernel arguments</param>
+        /// <param name="kernel">Optional kernel instance</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>An asynchronous enumerable of chat message content</returns>
         public override IAsyncEnumerable<ChatMessageContent> InvokeAsync(ChatHistory history, KernelArguments? arguments = null, Kernel? kernel = null, CancellationToken cancellationToken = default)
         {
             return _agent.InvokeAsync(history, arguments, kernel, cancellationToken);
         }
 
+        /// <summary>
+        /// Invokes the agent with a chat history to generate a streaming response.
+        /// Delegates to the underlying ChatCompletionAgent.
+        /// </summary>
+        /// <param name="history">The conversation history</param>
+        /// <param name="arguments">Optional kernel arguments</param>
+        /// <param name="kernel">Optional kernel instance</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>An asynchronous enumerable of streaming chat message content</returns>
         public override IAsyncEnumerable<StreamingChatMessageContent> InvokeStreamingAsync(ChatHistory history, KernelArguments? arguments = null, Kernel? kernel = null, CancellationToken cancellationToken = default)
         {
             return _agent.InvokeStreamingAsync(history, arguments, kernel, cancellationToken);
         }
 
+        /// <summary>
+        /// Invokes the agent with a collection of chat messages to generate a non-streaming response.
+        /// Delegates to the underlying ChatCompletionAgent.
+        /// </summary>
+        /// <param name="messages">Collection of chat messages</param>
+        /// <param name="thread">Optional agent thread</param>
+        /// <param name="options">Optional invoke options</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>An asynchronous enumerable of agent response items</returns>
         public override IAsyncEnumerable<AgentResponseItem<ChatMessageContent>> InvokeAsync(ICollection<ChatMessageContent> messages, AgentThread? thread = null, AgentInvokeOptions? options = null, CancellationToken cancellationToken = default)
         {
             return this._agent.InvokeAsync(messages, thread, options, cancellationToken);
         }
 
+        /// <summary>
+        /// Invokes the agent with a collection of chat messages to generate a streaming response.
+        /// Delegates to the underlying ChatCompletionAgent.
+        /// </summary>
+        /// <param name="messages">Collection of chat messages</param>
+        /// <param name="thread">Optional agent thread</param>
+        /// <param name="options">Optional invoke options</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>An asynchronous enumerable of streaming agent response items</returns>
         public override IAsyncEnumerable<AgentResponseItem<StreamingChatMessageContent>> InvokeStreamingAsync(ICollection<ChatMessageContent> messages, AgentThread? thread = null, AgentInvokeOptions? options = null, CancellationToken cancellationToken = default)
         {
             return this._agent.InvokeStreamingAsync(messages, thread, options, cancellationToken);
         }
 
+        /// <summary>
+        /// Restores an agent channel from a serialized state.
+        /// This method is required by the base class but not implemented for this agent.
+        /// </summary>
+        /// <param name="channelState">The serialized channel state</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>A task representing the asynchronous operation</returns>
+        /// <exception cref="NotImplementedException">This method is not implemented</exception>
         protected override Task<AgentChannel> RestoreChannelAsync(string channelState, CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
         }
 
-
+        /// <summary>
+        /// System prompt that provides instructions and schema information for generating Kusto queries.
+        /// This detailed prompt guides the language model to create properly formatted and efficient KQL.
+        /// </summary>
+        /// <remarks>
+        /// The prompt includes:
+        /// - Instructions for generating KQL queries
+        /// - Database schema information
+        /// - KQL syntax references
+        /// - Best practices for writing efficient KQL
+        /// - Example queries
+        /// </remarks>
         string KustoAgentSystemPrompt => """
         # Instructions
         You will receive a natural language request. As a cyber-security expert specializing in Microsoft USX, your task is to write a Kusto Query Language (KQL) query that fulfills the request while adhering to all best practices.
